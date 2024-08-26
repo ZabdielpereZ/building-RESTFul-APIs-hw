@@ -17,7 +17,7 @@ class MembersSchema(ma.Schema):
     class Meta:
         fields = ("id", "members_name", "email", "phone")
 
-members_schema = MembersSchema() # allows us to validate data for single customers when we send and receive
+member_schema = MembersSchema() # allows us to validate data for single customers when we send and receive
 members_schema = MembersSchema(many = True)  # allow us to validate multiple rows or entries from our customer table at the same time
 
 class WorkoutSchema(ma.Schema):
@@ -29,7 +29,7 @@ class Meta:
         fields = ("id", "members_name", "email", "phone")
 
 workout_schema = WorkoutSchema()
-workout_schema = WorkoutSchema(many = True)
+workouts_schema = WorkoutSchema(many = True)
 #=====================================================
 
 # CRUD Operations
@@ -40,6 +40,37 @@ workout_schema = WorkoutSchema(many = True)
 
 #======================================================
 
+# Create a workout session with a POST request
+@app.route("/workout_sessions", methods = ['POST'])
+def create_workout_session():
+    conn = connection()
+    if conn is not None:
+        try:
+            cursor = conn.cursor(dictionary= True)
+            workout_data = workout_schema.load(request.json)
+        except ValidationError as e:
+            return jsonify(e.messages), 400
+        try:
+            cursor = conn.cursor()
+
+            new_workout = (workout_data['duration'], workout_data['members_id'])
+
+            query = "INSERT INTO workout_sessions (duration, members_id) VALUES (%s, %s);"
+
+            cursor.execute(query, new_workout)
+            conn.commit()
+
+            return jsonify({'message': 'New session created successfully!'}), 201
+        
+        except Error as e:
+            return jsonify(e.messages), 500
+        finally:
+            cursor.close
+            conn.close()
+    else:
+        return jsonify({'error': 'Database connection failed.'}), 500
+
+# DONE
 # route to Get all Workout Sessions
 @app.route("/workout_sessions", methods = ['GET'])
 def get_workout_sessions():
@@ -63,21 +94,48 @@ def get_workout_sessions():
                 conn.close()
                 return workout_schema.jsonify(workout_sessions)
 
+# DONE
 # route to Get a single Workout Session by ID
-@app.route("/workout_sessions/<int:workout_id>", methods = ['GET'])
+@app.route("/workout_sessions/<int:id>", methods = ['GET'])
 def get_workout_session(id):
-    pass
+    conn = connection()
+    if conn is not None:
+        try:
+            cursor = conn.cursor()
+
+            query = "SELECT * FROM workout_sessions WHERE id = %s;"
+            cursor.execute(query, (id,))
+            workout = cursor.fetchone()
+            if not workout:
+                return jsonify({'error': 'Member not found.'}), 404
+
+            workout_data = {
+                'id': workout[0],
+                'duration': workout[1],
+                'member_id': workout[2],
+            }
+
+            return jsonify(workout_data), 200
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        return jsonify({'error': 'Database connection failed.'}), 500
 
 
+# DONE
 # Create a new member with a POST request
 @app.route("/members", methods = ['POST'])
 def add_member():
-    try:
-        member_data = members_schema.load(request.json)
-    except ValidationError as e:
-        return jsonify(e.messages), 400
     conn = connection()
     if conn is not None:
+        try:
+            cursor = conn.cursor(dictionary= True)
+            member_data = member_schema.load(request.json)
+        except ValidationError as e:
+            return jsonify(e.messages), 400
         try:
             cursor = conn.cursor()
 
@@ -98,7 +156,8 @@ def add_member():
     else:
         return jsonify({'error': 'Database connection failed.'}), 500
 
-# route to GET all customers
+# DONE
+# route to GET all members
 @app.route('/members', methods = ['GET'])
 def get_members():
     conn = connection()
@@ -120,11 +179,43 @@ def get_members():
                 conn.close()
                 return members_schema.jsonify(members)
 
+# DONE
+# route to Get a single member by ID
+@app.route("/members/<int:id>", methods = ['GET'])
+def get_member(id):
+    conn = connection()
+    if conn is not None:
+        try:
+            cursor = conn.cursor()
+
+            query = "SELECT * FROM members WHERE id = %s;"
+            cursor.execute(query, (id,))
+            member = cursor.fetchone()
+            if not member:
+                return jsonify({'error': 'Member not found.'}), 404
+
+            member_data = {
+                'id': member[0],
+                'name': member[1],
+                'email': member[2],
+                'phone': member[3]
+            }
+
+            return jsonify(member_data), 200
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        return jsonify({'error': 'Database connection failed.'}), 500
+
+# DONE
 # route to POST changes based on different query parameters
 @app.route("/members/<int:id>", methods=["PUT"])
 def update_member(id):
     try:
-        member_data = members_schema.load(request.json)
+        member_data = member_schema.load(request.json)
     except ValidationError as e:
         return jsonify(e.messages), 400
     
@@ -154,9 +245,10 @@ def update_member(id):
     else:
         return jsonify({'error': 'Database connection failed.'}), 500
 
+#  Done
 # a routes to DELETE a customers
 @app.route("/members/<int:id>", methods = ['DELETE'])
-def delete_members(id):
+def delete_member(id):
     conn = connection()
     if conn is not None:
         try:
