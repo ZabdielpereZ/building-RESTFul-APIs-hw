@@ -39,7 +39,7 @@ workouts_schema = WorkoutSchema(many = True)
 # Delete (DELETE)
 
 #======================================================
-
+# DONE 
 # Create a workout session with a POST request
 @app.route("/workout_sessions", methods = ['POST'])
 def create_workout_session():
@@ -70,7 +70,7 @@ def create_workout_session():
     else:
         return jsonify({'error': 'Database connection failed.'}), 500
 
-# DONE
+# DONE 
 # route to Get all Workout Sessions
 @app.route("/workout_sessions", methods = ['GET'])
 def get_workout_sessions():
@@ -79,7 +79,7 @@ def get_workout_sessions():
         try:
             cursor = conn.cursor(dictionary=True)
             
-            query = "SELECT * FROM workout_sessions;"
+            query = "SELECT * FROM workout_sessions"
 
             cursor.execute(query)
 
@@ -92,7 +92,7 @@ def get_workout_sessions():
             if conn and conn.is_connected():
                 cursor.close()
                 conn.close()
-                return workout_schema.jsonify(workout_sessions)
+                return workouts_schema.jsonify(workout_sessions)
 
 # DONE
 # route to Get a single Workout Session by ID
@@ -118,6 +118,42 @@ def get_workout_session(id):
             return jsonify(workout_data), 200
         except Error as e:
             return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        return jsonify({'error': 'Database connection failed.'}), 500
+
+# DONE
+# route to update workout session using 'PUT' method
+@app.route("/workout_sessions/<int:id>", methods=["PUT"])
+def update_session(id):
+    try:
+        workout_data = workout_schema.load(request.json)
+    except ValidationError as e:
+        return jsonify(e.messages), 400
+    
+    conn = connection()
+    if conn is not None:
+        try:
+            cursor = conn.cursor()
+
+            check_query = "SELECT * FROM workout_sessions WHERE id = %s;"
+            cursor.execute(check_query, (id,))
+            session = cursor.fetchone()
+            if not session:
+                return jsonify({'error': 'Workout session not found.'}), 404
+            
+            update_session = (workout_data['duration'], workout_data['members_id'], id)
+
+            query = "UPDATE workout_sessions SET duration = %s, members_id = %s WHERE id = %s;"
+            cursor.execute(query, update_session)
+            conn.commit()
+
+            return jsonify({'message': f'Workout session {id} updated successfully!'}), 200
+        except Error as e:
+            print("ERROR")
+            return jsonify(e.messages), 500
         finally:
             cursor.close()
             conn.close()
